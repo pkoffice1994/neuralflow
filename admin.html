@@ -1,0 +1,658 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+  <meta charset="UTF-8" />
+  <meta name="viewport" content="width=device-width, initial-scale=1.0" />
+  <title>NeuralFlow — Admin Panel</title>
+  <script src="https://cdn.jsdelivr.net/npm/@supabase/supabase-js@2"></script>
+  <style>
+    /* ── Reset & Variables ─────────────────────────────── */
+    *, *::before, *::after { box-sizing: border-box; margin: 0; padding: 0; }
+
+    :root {
+      --bg:        #0a0a0f;
+      --surface:   #111118;
+      --card:      #16161f;
+      --border:    #1e1e2e;
+      --accent:    #6ee7b7;
+      --accent2:   #818cf8;
+      --text:      #e2e8f0;
+      --muted:     #64748b;
+      --danger:    #f87171;
+      --warning:   #fbbf24;
+      --success:   #34d399;
+      --font:      'DM Sans', system-ui, sans-serif;
+    }
+
+    @import url('https://fonts.googleapis.com/css2?family=DM+Sans:wght@300;400;500;600;700&family=DM+Mono&display=swap');
+
+    body {
+      font-family: var(--font);
+      background: var(--bg);
+      color: var(--text);
+      min-height: 100vh;
+    }
+
+    /* ── Login Screen ──────────────────────────────────── */
+    #loginScreen {
+      display: flex;
+      align-items: center;
+      justify-content: center;
+      min-height: 100vh;
+      background: radial-gradient(ellipse at 50% 0%, #1a1a3e 0%, var(--bg) 60%);
+    }
+
+    .login-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 20px;
+      padding: 2.5rem;
+      width: 100%;
+      max-width: 400px;
+      text-align: center;
+    }
+
+    .login-card .logo {
+      font-size: 1.4rem;
+      font-weight: 700;
+      letter-spacing: -0.5px;
+      margin-bottom: 0.4rem;
+    }
+
+    .login-card .logo span { color: var(--accent); font-style: italic; }
+    .login-card p { color: var(--muted); font-size: 0.9rem; margin-bottom: 2rem; }
+
+    .login-card input {
+      width: 100%;
+      background: var(--surface);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.75rem 1rem;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.9rem;
+      margin-bottom: 0.75rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .login-card input:focus { border-color: var(--accent2); }
+
+    .login-btn {
+      width: 100%;
+      padding: 0.8rem;
+      background: linear-gradient(135deg, var(--accent2), #6366f1);
+      border: none;
+      border-radius: 10px;
+      color: #fff;
+      font-family: var(--font);
+      font-weight: 600;
+      font-size: 0.95rem;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      margin-top: 0.25rem;
+    }
+
+    .login-btn:hover { opacity: 0.85; }
+    .login-error { color: var(--danger); font-size: 0.85rem; margin-top: 0.75rem; display: none; }
+
+    /* ── App Shell ─────────────────────────────────────── */
+    #appShell { display: none; }
+
+    header {
+      background: var(--surface);
+      border-bottom: 1px solid var(--border);
+      padding: 0 2rem;
+      height: 60px;
+      display: flex;
+      align-items: center;
+      justify-content: space-between;
+      position: sticky;
+      top: 0;
+      z-index: 100;
+    }
+
+    .header-logo { font-size: 1.1rem; font-weight: 700; }
+    .header-logo span { color: var(--accent); font-style: italic; }
+
+    .header-right { display: flex; align-items: center; gap: 1rem; }
+
+    #userEmail {
+      font-size: 0.82rem;
+      color: var(--muted);
+      font-family: 'DM Mono', monospace;
+    }
+
+    .logout-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.4rem 0.9rem;
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 0.82rem;
+      cursor: pointer;
+      transition: all 0.2s;
+    }
+
+    .logout-btn:hover { border-color: var(--danger); color: var(--danger); }
+
+    main { padding: 2rem; max-width: 1400px; margin: 0 auto; }
+
+    /* ── Stats Cards ───────────────────────────────────── */
+    .stats-grid {
+      display: grid;
+      grid-template-columns: repeat(auto-fit, minmax(160px, 1fr));
+      gap: 1rem;
+      margin-bottom: 2rem;
+    }
+
+    .stat-card {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 14px;
+      padding: 1.25rem;
+    }
+
+    .stat-label {
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      margin-bottom: 0.4rem;
+    }
+
+    .stat-value {
+      font-size: 2rem;
+      font-weight: 700;
+      line-height: 1;
+    }
+
+    .stat-value.new     { color: var(--accent2); }
+    .stat-value.total   { color: var(--text); }
+    .stat-value.week    { color: var(--accent); }
+    .stat-value.qualified { color: var(--warning); }
+    .stat-value.closed  { color: var(--success); }
+
+    /* ── Controls Bar ──────────────────────────────────── */
+    .controls {
+      display: flex;
+      align-items: center;
+      gap: 1rem;
+      margin-bottom: 1.25rem;
+      flex-wrap: wrap;
+    }
+
+    .search-box {
+      flex: 1;
+      min-width: 200px;
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.9rem;
+      outline: none;
+      transition: border-color 0.2s;
+    }
+
+    .search-box:focus { border-color: var(--accent2); }
+    .search-box::placeholder { color: var(--muted); }
+
+    .filter-select {
+      background: var(--card);
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.88rem;
+      outline: none;
+      cursor: pointer;
+    }
+
+    .refresh-btn {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--muted);
+      padding: 0.6rem 1rem;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.88rem;
+      cursor: pointer;
+      transition: all 0.2s;
+      white-space: nowrap;
+    }
+
+    .refresh-btn:hover { border-color: var(--accent); color: var(--accent); }
+
+    .export-btn {
+      background: linear-gradient(135deg, var(--accent2), #6366f1);
+      border: none;
+      color: #fff;
+      padding: 0.6rem 1.2rem;
+      border-radius: 10px;
+      font-family: var(--font);
+      font-size: 0.88rem;
+      font-weight: 600;
+      cursor: pointer;
+      transition: opacity 0.2s;
+      white-space: nowrap;
+    }
+
+    .export-btn:hover { opacity: 0.85; }
+
+    /* ── Table ─────────────────────────────────────────── */
+    .table-wrap {
+      background: var(--card);
+      border: 1px solid var(--border);
+      border-radius: 16px;
+      overflow: hidden;
+    }
+
+    table { width: 100%; border-collapse: collapse; }
+
+    thead { background: var(--surface); }
+
+    th {
+      text-align: left;
+      padding: 0.85rem 1rem;
+      font-size: 0.75rem;
+      text-transform: uppercase;
+      letter-spacing: 0.08em;
+      color: var(--muted);
+      font-weight: 600;
+      border-bottom: 1px solid var(--border);
+    }
+
+    td {
+      padding: 0.85rem 1rem;
+      font-size: 0.88rem;
+      border-bottom: 1px solid var(--border);
+      vertical-align: top;
+    }
+
+    tr:last-child td { border-bottom: none; }
+
+    tr:hover td { background: rgba(255,255,255,0.02); }
+
+    .name-cell { font-weight: 600; }
+    .email-cell { color: var(--accent); font-family: 'DM Mono', monospace; font-size: 0.82rem; }
+    .company-cell { color: var(--muted); }
+    .message-cell { color: var(--muted); font-size: 0.82rem; max-width: 200px; }
+    .date-cell { color: var(--muted); font-size: 0.8rem; white-space: nowrap; }
+
+    .badge {
+      display: inline-flex;
+      align-items: center;
+      padding: 0.25rem 0.65rem;
+      border-radius: 20px;
+      font-size: 0.75rem;
+      font-weight: 600;
+      text-transform: capitalize;
+    }
+
+    .badge-new        { background: rgba(129,140,248,0.15); color: var(--accent2); }
+    .badge-contacted  { background: rgba(251,191,36,0.15);  color: var(--warning); }
+    .badge-qualified  { background: rgba(110,231,183,0.15); color: var(--accent);  }
+    .badge-closed     { background: rgba(52,211,153,0.15);  color: var(--success); }
+
+    .status-select {
+      background: transparent;
+      border: 1px solid var(--border);
+      color: var(--text);
+      padding: 0.3rem 0.5rem;
+      border-radius: 8px;
+      font-family: var(--font);
+      font-size: 0.82rem;
+      cursor: pointer;
+      outline: none;
+    }
+
+    .delete-btn {
+      background: transparent;
+      border: none;
+      color: var(--muted);
+      cursor: pointer;
+      font-size: 1rem;
+      padding: 0.25rem;
+      border-radius: 6px;
+      transition: color 0.2s;
+    }
+
+    .delete-btn:hover { color: var(--danger); }
+
+    /* ── Empty / Loading ───────────────────────────────── */
+    .empty-state {
+      text-align: center;
+      padding: 4rem 2rem;
+      color: var(--muted);
+    }
+
+    .empty-state .icon { font-size: 3rem; margin-bottom: 1rem; }
+    .empty-state p { font-size: 0.9rem; }
+
+    .loading-row td {
+      text-align: center;
+      padding: 3rem;
+      color: var(--muted);
+    }
+
+    /* ── Toast ─────────────────────────────────────────── */
+    .toast {
+      position: fixed;
+      bottom: 1.5rem;
+      right: 1.5rem;
+      background: var(--success);
+      color: #fff;
+      padding: 0.75rem 1.25rem;
+      border-radius: 10px;
+      font-size: 0.88rem;
+      font-weight: 500;
+      z-index: 9999;
+      animation: slideUp 0.3s ease;
+      box-shadow: 0 4px 20px rgba(0,0,0,0.4);
+    }
+
+    @keyframes slideUp {
+      from { transform: translateY(12px); opacity: 0; }
+      to   { transform: translateY(0);    opacity: 1; }
+    }
+  </style>
+</head>
+<body>
+
+<!-- ── LOGIN SCREEN ───────────────────────────────────────── -->
+<div id="loginScreen">
+  <div class="login-card">
+    <div class="logo">Neural<span>Flow</span></div>
+    <p>Admin Panel — Sign in to continue</p>
+    <input type="email" id="loginEmail" placeholder="admin@email.com" />
+    <input type="password" id="loginPassword" placeholder="Password" />
+    <button class="login-btn" onclick="handleLogin()">Sign In →</button>
+    <div class="login-error" id="loginError">Invalid credentials. Try again.</div>
+  </div>
+</div>
+
+<!-- ── APP SHELL ──────────────────────────────────────────── -->
+<div id="appShell">
+  <header>
+    <div class="header-logo">Neural<span>Flow</span> <span style="color:var(--muted);font-weight:400;font-size:0.8rem">/ Admin</span></div>
+    <div class="header-right">
+      <span id="userEmail"></span>
+      <button class="logout-btn" onclick="handleLogout()">Sign Out</button>
+    </div>
+  </header>
+
+  <main>
+    <!-- Stats -->
+    <div class="stats-grid">
+      <div class="stat-card">
+        <div class="stat-label">Total Leads</div>
+        <div class="stat-value total" id="statTotal">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">New</div>
+        <div class="stat-value new" id="statNew">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">This Week</div>
+        <div class="stat-value week" id="statWeek">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Qualified</div>
+        <div class="stat-value qualified" id="statQualified">—</div>
+      </div>
+      <div class="stat-card">
+        <div class="stat-label">Closed</div>
+        <div class="stat-value closed" id="statClosed">—</div>
+      </div>
+    </div>
+
+    <!-- Controls -->
+    <div class="controls">
+      <input class="search-box" id="searchInput" type="text" placeholder="🔍  Search by name, email, company..." oninput="filterLeads()" />
+      <select class="filter-select" id="statusFilter" onchange="filterLeads()">
+        <option value="">All Statuses</option>
+        <option value="new">New</option>
+        <option value="contacted">Contacted</option>
+        <option value="qualified">Qualified</option>
+        <option value="closed">Closed</option>
+      </select>
+      <button class="refresh-btn" onclick="loadLeads()">↻ Refresh</button>
+      <button class="export-btn" onclick="exportCSV()">↓ Export CSV</button>
+    </div>
+
+    <!-- Table -->
+    <div class="table-wrap">
+      <table>
+        <thead>
+          <tr>
+            <th>Name</th>
+            <th>Email</th>
+            <th>Company</th>
+            <th>Interested In</th>
+            <th>Message</th>
+            <th>Status</th>
+            <th>Date</th>
+            <th></th>
+          </tr>
+        </thead>
+        <tbody id="leadsTable">
+          <tr class="loading-row"><td colspan="8">Loading leads…</td></tr>
+        </tbody>
+      </table>
+    </div>
+  </main>
+</div>
+
+<script>
+  // ── CONFIG ──────────────────────────────────────────────────
+  const SUPABASE_URL     = 'https://YOUR_PROJECT_ID.supabase.co';
+  const SUPABASE_ANON_KEY = 'YOUR_ANON_PUBLIC_KEY';
+
+  // ── Init Supabase ───────────────────────────────────────────
+  const { createClient } = supabase;
+  const db = createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
+
+  let allLeads = [];
+
+  // ── AUTH ────────────────────────────────────────────────────
+  async function handleLogin() {
+    const email    = document.getElementById('loginEmail').value.trim();
+    const password = document.getElementById('loginPassword').value;
+    const errEl    = document.getElementById('loginError');
+
+    errEl.style.display = 'none';
+
+    const { data, error } = await db.auth.signInWithPassword({ email, password });
+
+    if (error) {
+      errEl.style.display = 'block';
+      return;
+    }
+
+    showApp(data.user.email);
+  }
+
+  async function handleLogout() {
+    await db.auth.signOut();
+    document.getElementById('appShell').style.display    = 'none';
+    document.getElementById('loginScreen').style.display = 'flex';
+  }
+
+  function showApp(email) {
+    document.getElementById('loginScreen').style.display = 'none';
+    document.getElementById('appShell').style.display    = 'block';
+    document.getElementById('userEmail').textContent     = email;
+    loadLeads();
+  }
+
+  // Check if already logged in
+  db.auth.getSession().then(({ data: { session } }) => {
+    if (session?.user) showApp(session.user.email);
+  });
+
+  // ── LOAD LEADS ──────────────────────────────────────────────
+  async function loadLeads() {
+    document.getElementById('leadsTable').innerHTML =
+      '<tr class="loading-row"><td colspan="8">Loading…</td></tr>';
+
+    const { data, error } = await db
+      .from('leads')
+      .select('*')
+      .order('created_at', { ascending: false });
+
+    if (error) {
+      console.error(error);
+      return;
+    }
+
+    allLeads = data;
+    updateStats(data);
+    renderTable(data);
+  }
+
+  // ── STATS ───────────────────────────────────────────────────
+  function updateStats(leads) {
+    const weekAgo = new Date(Date.now() - 7 * 24 * 60 * 60 * 1000);
+    document.getElementById('statTotal').textContent     = leads.length;
+    document.getElementById('statNew').textContent       = leads.filter(l => l.status === 'new').length;
+    document.getElementById('statWeek').textContent      = leads.filter(l => new Date(l.created_at) > weekAgo).length;
+    document.getElementById('statQualified').textContent = leads.filter(l => l.status === 'qualified').length;
+    document.getElementById('statClosed').textContent    = leads.filter(l => l.status === 'closed').length;
+  }
+
+  // ── RENDER TABLE ────────────────────────────────────────────
+  function renderTable(leads) {
+    const tbody = document.getElementById('leadsTable');
+
+    if (!leads.length) {
+      tbody.innerHTML = `
+        <tr><td colspan="8">
+          <div class="empty-state">
+            <div class="icon">📭</div>
+            <p>No leads found.</p>
+          </div>
+        </td></tr>`;
+      return;
+    }
+
+    tbody.innerHTML = leads.map(lead => `
+      <tr id="row-${lead.id}">
+        <td class="name-cell">${esc(lead.first_name)} ${esc(lead.last_name)}</td>
+        <td class="email-cell">${esc(lead.email)}</td>
+        <td class="company-cell">${esc(lead.company || '—')}</td>
+        <td><span class="badge badge-new" style="font-size:0.72rem">${esc(lead.interest || '—')}</span></td>
+        <td class="message-cell" title="${esc(lead.message || '')}">
+          ${lead.message ? esc(lead.message).slice(0, 60) + (lead.message.length > 60 ? '…' : '') : '—'}
+        </td>
+        <td>
+          <select class="status-select" onchange="updateStatus('${lead.id}', this.value)">
+            <option value="new"       ${lead.status === 'new'       ? 'selected' : ''}>🔵 New</option>
+            <option value="contacted" ${lead.status === 'contacted' ? 'selected' : ''}>🟡 Contacted</option>
+            <option value="qualified" ${lead.status === 'qualified' ? 'selected' : ''}>🟠 Qualified</option>
+            <option value="closed"    ${lead.status === 'closed'    ? 'selected' : ''}>🟢 Closed</option>
+          </select>
+        </td>
+        <td class="date-cell">${formatDate(lead.created_at)}</td>
+        <td>
+          <button class="delete-btn" onclick="deleteLead('${lead.id}')" title="Delete">🗑</button>
+        </td>
+      </tr>
+    `).join('');
+  }
+
+  // ── FILTER ──────────────────────────────────────────────────
+  function filterLeads() {
+    const q      = document.getElementById('searchInput').value.toLowerCase();
+    const status = document.getElementById('statusFilter').value;
+
+    const filtered = allLeads.filter(lead => {
+      const matchQ = !q ||
+        `${lead.first_name} ${lead.last_name} ${lead.email} ${lead.company || ''}`.toLowerCase().includes(q);
+      const matchStatus = !status || lead.status === status;
+      return matchQ && matchStatus;
+    });
+
+    renderTable(filtered);
+  }
+
+  // ── UPDATE STATUS ────────────────────────────────────────────
+  async function updateStatus(id, newStatus) {
+    const { error } = await db
+      .from('leads')
+      .update({ status: newStatus })
+      .eq('id', id);
+
+    if (!error) {
+      const lead = allLeads.find(l => l.id === id);
+      if (lead) lead.status = newStatus;
+      showToast('Status updated ✓');
+    }
+  }
+
+  // ── DELETE LEAD ──────────────────────────────────────────────
+  async function deleteLead(id) {
+    if (!confirm('Delete this lead? This cannot be undone.')) return;
+
+    const { error } = await db.from('leads').delete().eq('id', id);
+
+    if (!error) {
+      allLeads = allLeads.filter(l => l.id !== id);
+      document.getElementById(`row-${id}`)?.remove();
+      updateStats(allLeads);
+      showToast('Lead deleted');
+    }
+  }
+
+  // ── EXPORT CSV ───────────────────────────────────────────────
+  function exportCSV() {
+    const headers = ['ID','First Name','Last Name','Email','Company','Interest','Message','Status','Date'];
+    const rows = allLeads.map(l => [
+      l.id, l.first_name, l.last_name, l.email,
+      l.company || '', l.interest || '', (l.message || '').replace(/,/g, ';'),
+      l.status, formatDate(l.created_at)
+    ]);
+
+    const csv = [headers, ...rows].map(r => r.join(',')).join('\n');
+    const blob = new Blob([csv], { type: 'text/csv' });
+    const url  = URL.createObjectURL(blob);
+    const a    = document.createElement('a');
+    a.href = url;
+    a.download = `neuralflow-leads-${new Date().toISOString().slice(0,10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+  }
+
+  // ── HELPERS ──────────────────────────────────────────────────
+  function esc(str) {
+    return String(str || '').replace(/&/g,'&amp;').replace(/</g,'&lt;').replace(/>/g,'&gt;');
+  }
+
+  function formatDate(iso) {
+    return new Date(iso).toLocaleDateString('en-IN', {
+      day: '2-digit', month: 'short', year: 'numeric',
+      hour: '2-digit', minute: '2-digit'
+    });
+  }
+
+  function showToast(msg) {
+    document.querySelector('.toast')?.remove();
+    const t = document.createElement('div');
+    t.className = 'toast';
+    t.textContent = msg;
+    document.body.appendChild(t);
+    setTimeout(() => t.remove(), 3000);
+  }
+
+  // Enter key on login
+  document.addEventListener('keydown', e => {
+    if (e.key === 'Enter' && document.getElementById('loginScreen').style.display !== 'none') {
+      handleLogin();
+    }
+  });
+</script>
+</body>
+</html>
