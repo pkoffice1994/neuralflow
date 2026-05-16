@@ -1479,10 +1479,8 @@ footer{
   // ═══════════════════════════════════════
   const db = window.supabase.createClient(SUPABASE_URL, SUPABASE_ANON_KEY);
 
-  const emailJSReady = EMAILJS_PUBLIC_KEY !== "YOUR_EMAILJS_PUBLIC_KEY";
-  if (emailJSReady) {
-    emailjs.init(EMAILJS_PUBLIC_KEY);
-  }
+  emailjs.init(EMAILJS_PUBLIC_KEY);
+  const emailJSReady = true;
 
   // ═══════════════════════════════════════
   // FORM SUBMIT
