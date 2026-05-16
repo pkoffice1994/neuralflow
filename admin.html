@@ -500,7 +500,7 @@
       '<tr class="loading-row"><td colspan="8">Loading…</td></tr>';
 
     const { data, error } = await db
-      .from('leads')
+      .from('contact_leads')
       .select('*')
       .order('created_at', { ascending: false });
 
